@@ -1,147 +1,233 @@
-PS lab2> git config --global user.name "Student"
-PS lab2> git config --global user.email "student@example.com"
-PS lab2> git config --global init.defaultBranch master
 
-# 4.2.1
-PS lab2> mkdir repo_new
-PS lab2/repo_new> git init
-Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_new/.git/
-PS lab2/repo_new> git status
+PS e:\Devops_lab\lab_2> git config --global user.name "Student"
+
+PS e:\Devops_lab\lab_2> git config --global user.email "student@example.com"
+
+PS e:\Devops_lab\lab_2> git config --global init.defaultBranch master
+
+PS e:\Devops_lab\lab_2> mkdir repo_new -Force | Out-Null
+
+PS e:\Devops_lab\lab_2> git init
+
+Initialized empty Git repository in E:/Devops_lab/lab_2/repo_new/.git/
+
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
 
 No commits yet
 
 nothing to commit (create/copy files and use "git add" to track)
 
-# 4.2.2
-PS lab2/repo_new> git status
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
 
 No commits yet
 
 Untracked files:
   (use "git add <file>..." to include in what will be committed)
-        file.txt
+	file.txt
 
 nothing added to commit but untracked files present (use "git add" to track)
-PS lab2/repo_new> git add .
-PS lab2/repo_new> git status
+
+PS e:\Devops_lab\lab_2> git add .
+
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
 
 No commits yet
 
 Changes to be committed:
   (use "git rm --cached <file>..." to unstage)
-        new file:   file.txt
+	new file:   file.txt
 
-PS lab2/repo_new> mkdir empty
-PS lab2/repo_new> git status
+
+PS e:\Devops_lab\lab_2> mkdir empty -Force | Out-Null
+
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
 
 No commits yet
 
 Changes to be committed:
   (use "git rm --cached <file>..." to unstage)
-        new file:   file.txt
+	new file:   file.txt
 
 Untracked files:
   (use "git add <file>..." to include in what will be committed)
-        empty/
+	empty/
 
-PS lab2/repo_new> git add .
-PS lab2/repo_new> git commit -m "First commit"
-[master (root-commit) c4e1dc4] First commit
- 2 files changed, 0 insertions(+), 0 deletions(-) 
+
+PS e:\Devops_lab\lab_2> git add .
+
+PS e:\Devops_lab\lab_2> git commit -m "First commit"
+
+[master (root-commit) ec54207] First commit
+ 2 files changed, 2 insertions(+)
  create mode 100644 empty/.gitkeep
  create mode 100644 file.txt
-PS lab2/repo_new> git status
+
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
 nothing to commit, working tree clean
 
-# 4.2.3
-PS lab2> mkdir repo_master
-PS lab2/repo_master> git init
-Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_master/.git/
-PS lab2/repo_new> git remote add origin "../repo_master"
-PS lab2/repo_new> git push --set-upstream origin master
-remote: error: refusing to update checked out branch: refs/heads/master
-error: failed to push some refs to '../repo_master'
+PS e:\Devops_lab\lab_2> mkdir repo_master -Force | Out-Null
 
-PS lab2> Remove-Item -Recurse -Force repo_master
-PS lab2> mkdir repo_master
-PS lab2/repo_master> git init --bare
-Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_master/
-PS lab2/repo_new> git push --set-upstream origin master
- * [new branch]      master -> master
+PS e:\Devops_lab\lab_2> git init
+
+Initialized empty Git repository in E:/Devops_lab/lab_2/repo_master/.git/
+
+PS e:\Devops_lab\lab_2> git remote add origin "../repo_master"
+
+PS e:\Devops_lab\lab_2> git push --set-upstream origin master
+
+PS e:\Devops_lab\lab_2> Remove-Item -Recurse -Force repo_master
+
+PS e:\Devops_lab\lab_2> mkdir repo_master -Force | Out-Null
+
+PS e:\Devops_lab\lab_2> git init --bare
+
+Initialized empty Git repository in E:/Devops_lab/lab_2/repo_master/
+
+PS e:\Devops_lab\lab_2> git push --set-upstream origin master
+
 branch 'master' set up to track 'origin/master'.
-PS lab2/repo_new> git push
-Everything up-to-date
-PS lab2/repo_new> git status
+
+PS e:\Devops_lab\lab_2> git push
+
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
 Your branch is up to date with 'origin/master'.
+
 nothing to commit, working tree clean
 
-# 4.2.4
-PS lab2> mkdir repo_test
-PS lab2/repo_test> git init
-Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_test/.git/
-PS lab2/repo_test> git add .
-PS lab2/repo_test> git commit -m "aaa"
-[master (root-commit) ...] aaa
-PS lab2/repo_test> git remote add origin "../repo_master"
-PS lab2/repo_test> git push --set-upstream origin master
-PS lab2> Remove-Item -Recurse -Force repo_test
+PS e:\Devops_lab\lab_2> mkdir repo_test -Force | Out-Null
 
-# 4.2.5
-PS lab2> git clone "./repo_master" "repo_cloned"
-Cloning into 'repo_cloned'...
-done.
-PS lab2/repo_cloned> git status
+PS e:\Devops_lab\lab_2> git init
+
+Initialized empty Git repository in E:/Devops_lab/lab_2/repo_test/.git/
+
+PS e:\Devops_lab\lab_2> git add .
+
+PS e:\Devops_lab\lab_2> git commit -m "aaa"
+
+[master (root-commit) 65ce770] aaa
+ 1 file changed, 1 insertion(+)
+ create mode 100644 rand.txt
+
+PS e:\Devops_lab\lab_2> git remote add origin "../repo_master"
+
+PS e:\Devops_lab\lab_2> git push --set-upstream origin master
+
+PS e:\Devops_lab\lab_2> Remove-Item -Recurse -Force repo_test
+
+PS e:\Devops_lab\lab_2> git clone "./repo_master" "repo_cloned"
+
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
 Your branch is up to date with 'origin/master'.
+
 nothing to commit, working tree clean
 
-# 4.2.6
-PS lab2/repo_cloned> git status
+PS e:\Devops_lab\lab_2> git status
+
 On branch master
+Your branch is up to date with 'origin/master'.
+
 Changes not staged for commit:
-  modified:   file.txt
-PS lab2/repo_cloned> git add .
-PS lab2/repo_cloned> git commit -m "second"
-[master e096b22] second
-PS lab2/repo_cloned> git push
-To /Users/kirill/DevOps/lab2/repo_master
-   c4e1dc4..e096b22  master -> master
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   file.txt
 
-PS lab2/repo_new> git add .
-PS lab2/repo_new> git commit -m "other second"
-[master 0a46ee5] other second
-PS lab2/repo_new> git push
- ! [rejected] master -> master (fetch first)
+no changes added to commit (use "git add" and/or "git commit -a")
 
-PS lab2/repo_new> git pull
+PS e:\Devops_lab\lab_2> git add .
+
+PS e:\Devops_lab\lab_2> git commit -m "second"
+
+[master 1a60b02] second
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+PS e:\Devops_lab\lab_2> git push
+
+PS e:\Devops_lab\lab_2> git add .
+
+PS e:\Devops_lab\lab_2> git commit -m "other second"
+
+[master 97a47f1] other second
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+PS e:\Devops_lab\lab_2> git push
+
+PS e:\Devops_lab\lab_2> git pull
+
+Auto-merging file.txt
 CONFLICT (content): Merge conflict in file.txt
 Automatic merge failed; fix conflicts and then commit the result.
 
-# Resolving conflict: combined both lines
-PS lab2/repo_new> git status
-On branch master
-Unmerged paths: file.txt
+PS e:\Devops_lab\lab_2> git status
 
-PS lab2/repo_new> git add file.txt
-PS lab2/repo_new> git commit -m "Merged"
-[master 90c3fb4] Merged
-
-PS lab2/repo_new> git status
 On branch master
+Your branch and 'origin/master' have diverged,
+and have 1 and 1 different commits each, respectively.
+  (use "git pull" if you want to integrate the remote branch with yours)
+
+You have unmerged paths.
+  (fix conflicts and run "git commit")
+  (use "git merge --abort" to abort the merge)
+
+Unmerged paths:
+  (use "git add <file>..." to mark resolution)
+	both modified:   file.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+PS e:\Devops_lab\lab_2> git add file.txt
+
+PS e:\Devops_lab\lab_2> git commit -m "Merged"
+
+[master 00a8be9] Merged
+
+PS e:\Devops_lab\lab_2> git status
+
+On branch master
+Your branch is ahead of 'origin/master' by 2 commits.
+  (use "git push" to publish your local commits)
+
 nothing to commit, working tree clean
 
-PS lab2/repo_new> git push
-To ../repo_master
-   e096b22..90c3fb4  master -> master
+PS e:\Devops_lab\lab_2> git push
 
-PS lab2/repo_new> git log -n 4
-90c3fb4 Merged
-0a46ee5 other second
-e096b22 second
-c4e1dc4 First commit
+PS e:\Devops_lab\lab_2> git log -n 4
+
+commit 00a8be910390cdc03f9034fd4ed10c5357d9580e
+Merge: 97a47f1 1a60b02
+Author: Student <student@example.com>
+Date:   Sun Mar 8 15:06:44 2026 +0300
+
+    Merged
+
+commit 97a47f1a22ff0eaed57d194154a8b37baf0de72b
+Author: Student <student@example.com>
+Date:   Sun Mar 8 15:06:44 2026 +0300
+
+    other second
+
+commit 1a60b021da94f06cd680e547ed0d201b1d835457
+Author: Student <student@example.com>
+Date:   Sun Mar 8 15:06:44 2026 +0300
+
+    second
+
+commit ec54207d36330615b1ab81a7c2ae8b6260a4699b
+Author: Student <student@example.com>
+Date:   Sun Mar 8 15:06:42 2026 +0300
+
+    First commit
+

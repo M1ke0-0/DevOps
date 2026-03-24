@@ -1,2 +1,0 @@
-Text from repo_new repository
-Text from repo_cloned repository
