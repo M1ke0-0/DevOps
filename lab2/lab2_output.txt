@@ -1,0 +1,147 @@
+PS lab2> git config --global user.name "Student"
+PS lab2> git config --global user.email "student@example.com"
+PS lab2> git config --global init.defaultBranch master
+
+# 4.2.1
+PS lab2> mkdir repo_new
+PS lab2/repo_new> git init
+Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_new/.git/
+PS lab2/repo_new> git status
+On branch master
+
+No commits yet
+
+nothing to commit (create/copy files and use "git add" to track)
+
+# 4.2.2
+PS lab2/repo_new> git status
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        file.txt
+
+nothing added to commit but untracked files present (use "git add" to track)
+PS lab2/repo_new> git add .
+PS lab2/repo_new> git status
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   file.txt
+
+PS lab2/repo_new> mkdir empty
+PS lab2/repo_new> git status
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   file.txt
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        empty/
+
+PS lab2/repo_new> git add .
+PS lab2/repo_new> git commit -m "First commit"
+[master (root-commit) c4e1dc4] First commit
+ 2 files changed, 0 insertions(+), 0 deletions(-) 
+ create mode 100644 empty/.gitkeep
+ create mode 100644 file.txt
+PS lab2/repo_new> git status
+On branch master
+nothing to commit, working tree clean
+
+# 4.2.3
+PS lab2> mkdir repo_master
+PS lab2/repo_master> git init
+Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_master/.git/
+PS lab2/repo_new> git remote add origin "../repo_master"
+PS lab2/repo_new> git push --set-upstream origin master
+remote: error: refusing to update checked out branch: refs/heads/master
+error: failed to push some refs to '../repo_master'
+
+PS lab2> Remove-Item -Recurse -Force repo_master
+PS lab2> mkdir repo_master
+PS lab2/repo_master> git init --bare
+Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_master/
+PS lab2/repo_new> git push --set-upstream origin master
+ * [new branch]      master -> master
+branch 'master' set up to track 'origin/master'.
+PS lab2/repo_new> git push
+Everything up-to-date
+PS lab2/repo_new> git status
+On branch master
+Your branch is up to date with 'origin/master'.
+nothing to commit, working tree clean
+
+# 4.2.4
+PS lab2> mkdir repo_test
+PS lab2/repo_test> git init
+Initialized empty Git repository in /Users/kirill/DevOps/lab2/repo_test/.git/
+PS lab2/repo_test> git add .
+PS lab2/repo_test> git commit -m "aaa"
+[master (root-commit) ...] aaa
+PS lab2/repo_test> git remote add origin "../repo_master"
+PS lab2/repo_test> git push --set-upstream origin master
+PS lab2> Remove-Item -Recurse -Force repo_test
+
+# 4.2.5
+PS lab2> git clone "./repo_master" "repo_cloned"
+Cloning into 'repo_cloned'...
+done.
+PS lab2/repo_cloned> git status
+On branch master
+Your branch is up to date with 'origin/master'.
+nothing to commit, working tree clean
+
+# 4.2.6
+PS lab2/repo_cloned> git status
+On branch master
+Changes not staged for commit:
+  modified:   file.txt
+PS lab2/repo_cloned> git add .
+PS lab2/repo_cloned> git commit -m "second"
+[master e096b22] second
+PS lab2/repo_cloned> git push
+To /Users/kirill/DevOps/lab2/repo_master
+   c4e1dc4..e096b22  master -> master
+
+PS lab2/repo_new> git add .
+PS lab2/repo_new> git commit -m "other second"
+[master 0a46ee5] other second
+PS lab2/repo_new> git push
+ ! [rejected] master -> master (fetch first)
+
+PS lab2/repo_new> git pull
+CONFLICT (content): Merge conflict in file.txt
+Automatic merge failed; fix conflicts and then commit the result.
+
+# Resolving conflict: combined both lines
+PS lab2/repo_new> git status
+On branch master
+Unmerged paths: file.txt
+
+PS lab2/repo_new> git add file.txt
+PS lab2/repo_new> git commit -m "Merged"
+[master 90c3fb4] Merged
+
+PS lab2/repo_new> git status
+On branch master
+nothing to commit, working tree clean
+
+PS lab2/repo_new> git push
+To ../repo_master
+   e096b22..90c3fb4  master -> master
+
+PS lab2/repo_new> git log -n 4
+90c3fb4 Merged
+0a46ee5 other second
+e096b22 second
+c4e1dc4 First commit
