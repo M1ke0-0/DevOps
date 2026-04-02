@@ -110,122 +110,135 @@ docker inspect nginx-lab3 | jq -r '.[0].State.Status'
 
 ### 4.5 Dockerfile для Python приложения
 
-Создано простое Flask-приложение со следующей структурой:
+Создано веб-приложение на базе **FastAPI**.
 
-**app.py:**
-```python
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route('/')
-def hello():
-    return '<h1>Hello from Python Flask App!</h1><p>Running inside Docker container.</p>'
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-```
-
-**requirements.txt:**
-```
-flask==3.0.0
-```
+**Особенности приложения:**
+В папке `devops-lab3-main/python` находится серверный код (с использованием `uvicorn`) и файл `requirements.txt` с зависимостями. Приложение отвечает на HTTP-запросы и автоматически генерирует документацию Swagger.
 
 **Dockerfile:**
 ```dockerfile
+# Используем официальный образ Python
 FROM python:3.12-slim
 
+# Указываем рабочую директорию
 WORKDIR /app
 
+# Копируем файл с зависимостями
 COPY requirements.txt .
+
+# Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+# Копируем исходный код приложения
+COPY src/ ./src/
 
-EXPOSE 5000
+# Указываем переменную окружения для порта (по умолчанию 8080)
+ENV SERVER_PORT=8080
 
-CMD ["python", "app.py"]
+# Открываем порт
+EXPOSE 8080
+
+# Запускаем приложение
+CMD ["python", "src/main.py"]
 ```
 
 Описание инструкций:
 - `FROM python:3.12-slim` — базовый образ с Python 3.12 (slim-версия для минимального размера);
-- `WORKDIR /app` — рабочая директория внутри контейнера;
 - `COPY requirements.txt .` + `RUN pip install ...` — копирование зависимостей и их установка (отдельный слой для кэширования);
-- `COPY app.py .` — копирование кода приложения;
-- `EXPOSE 5000` — объявление порта приложения;
-- `CMD ["python", "app.py"]` — команда запуска.
+- `COPY src/ ./src/` — копирование кода приложения;
+- `CMD ["python", "src/main.py"]` — команда запуска через встроенный uvicorn.
 
-Сборка и запуск:
+**Сборка и ручной запуск (через docker run):**
 ```bash
-docker build -t python-app ./python
-docker run -d --name python-lab3 -p 5000:5000 python-app
+docker build -t lab3-python-app ./devops-lab3-main/python
+docker run -d --name python-lab3 -p 8082:8080 lab3-python-app
 ```
-
-Проверка: при обращении на `http://localhost:5000` отображается приветственная страница Flask-приложения.
+*(Порт заменен на 8082 на хосте, чтобы избежать конфликтов с другими сервисами).*
+Проверка: при обращении на `http://localhost:8082/docs` отображается страница Swagger FastAPI-приложения.
 
 ### 4.6 Dockerfile для Java приложения
 
-Создан простой HTTP-сервер на Java:
+Создан проект на базе **Spring Boot** и **Maven**. Для того чтобы итоговый образ был легковесным и безопасным, используется **Multi-stage сборка**.
 
-**Main.java:**
-```java
-import com.sun.net.httpserver.HttpServer;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpExchange;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
+**Особенности приложения:**
+Код представляет собой Spring Boot приложение, собираемое через `pom.xml`.
 
-public class Main {
-    public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
-        server.createContext("/", exchange -> {
-            String response = "<h1>Hello from Java App!</h1><p>Running inside Docker container.</p>";
-            exchange.sendResponseHeaders(200, response.getBytes().length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        });
-        server.start();
-        System.out.println("Server started on port 8080");
-    }
-}
-```
-
-**Dockerfile:**
+**multi-stage.Dockerfile:**
 ```dockerfile
-FROM eclipse-temurin:17-jdk
+# Стадия сборки
+FROM maven:3.8.5-openjdk-17-slim AS build
 
 WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-COPY Main.java .
+# Стадия запуска
+FROM eclipse-temurin:17.0.14_7-jre-jammy
 
-RUN javac Main.java
+WORKDIR /app
+# Копируем только готовый JAR из стадии сборки
+COPY --from=build /app/target/*.jar app.jar
 
-EXPOSE 8080
-
-CMD ["java", "Main"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-Описание инструкций:
-- `FROM eclipse-temurin:17-jdk` — базовый образ с JDK 17 (Eclipse Temurin);
-- `RUN javac Main.java` — компиляция Java-кода на этапе сборки образа;
-- `EXPOSE 8080` — объявление порта;
-- `CMD ["java", "Main"]` — запуск скомпилированного класса.
+Описание процесса **Multi-stage**:
+1. На первой стадии (`build`) контейнер использует образ с полным JDK и Maven (тяжелый образ), чтобы скачать все зависимости и скомпилировать `.jar` файл.
+2. На второй стадии (финальный образ) используется только легкий образ JRE (`eclipse-temurin...jre`). Из первой стадии в него копируется исключительно собранный файл `app.jar`. Это делает контейнер компактным и безопасным для продакшена.
 
-Сборка и запуск:
+**Сборка и ручной запуск (через docker run):**
 ```bash
-docker build -t java-app ./java
-docker run -d --name java-lab3 -p 8080:8080 java-app
+docker build -t lab3-java-app -f devops-lab3-main/java/multi-stage.Dockerfile ./devops-lab3-main/java
+docker run -d --name java-lab3 -p 8081:8080 lab3-java-app
+```
+Проверка: работу приложения можно отследить через `docker logs java-lab3`.
+
+---
+
+### 4.7 Оркестрация с помощью Docker Compose
+
+Хотя все контейнеры (Nginx, Python, Java) можно запустить вручную через команды `docker run`, это неудобно: приходится вручную прописывать проброс портов и имена для каждого сервиса.
+
+Чтобы упростить эту задачу, я также реализовал запуск через **Docker Compose**:
+
+**docker-compose.yml:**
+```yaml
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    container_name: nginx-lab3
+    ports:
+      - "8000:80"
+
+  python-app:
+    build:
+      context: ./devops-lab3-main/python
+      dockerfile: Dockerfile
+    container_name: python-lab3
+    ports:
+      - "8082:8080"
+
+  java-app:
+    build:
+      context: ./devops-lab3-main/java
+      dockerfile: multi-stage.Dockerfile
+    container_name: java-lab3
+    ports:
+      - "8081:8080"
 ```
 
-Все три контейнера работают одновременно:
-```
-CONTAINER ID   IMAGE        COMMAND                  PORTS                                         NAMES
-6c2f7190c1a4   java-app     "/__cacert_entrypoin…"   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   java-lab3
-273d14af0efb   python-app   "python app.py"          0.0.0.0:5000->5000/tcp, [::]:5000->5000/tcp   python-lab3
-b4c7a082c54e   nginx-custom "..."                   0.0.0.0:8000->80/tcp, [::]:8000->80/tcp       nginx-lab3
-```
+Это позволяет:
+- Запустить сразу все три сервиса (Nginx, FastAPI, Spring Boot) одной командой:
+  ```bash
+  docker compose up -d --build
+  ```
+- Остановить всё также одной командой:
+  ```bash
+  docker compose down
+  ```
 
 ## 5. Контрольные вопросы
 
@@ -247,4 +260,4 @@ Docker — это платформа для контейнеризации пр�
 3. Использовать флаг `--rm` для автоматического удаления контейнера после остановки: `docker run --rm <образ>`.
 
 ## Вывод:
-В ходе лабораторной работы были освоены основные навыки работы с Docker: запуск контейнеров из готовых образов и создание собственных кастомизированных образов (nginx с измененной приветственной страницей), просмотр логов, инспектирование контейнеров для получения детальной информации, а также написание собственных Dockerfile для Python (Flask) и Java приложений. Все контейнеры были успешно собраны, запущены и протестированы.
+В ходе лабораторной работы были освоены расширенные навыки работы с Docker: запуск контейнеров, создание собственных кастомизированных образов (nginx с измененной приветственной страницей), а также написание Dockerfile для современных стеков технологий — Python (FastAPI) и Java (Spring Boot с использованием Maven). Особое внимание было уделено концепции Multi-stage сборок, что позволяет существенно оптимизировать размер и безопасность финальных образов. В завершение работы был реализован запуск всех контейнеров в единой среде оркестрации с помощью `docker compose`, что значительно упростило развертывание многоконтейнерного приложения.

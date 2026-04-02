@@ -40,37 +40,95 @@ COPY index.html /usr/share/nginx/html/index.html # Копируем НАШ фа�
 
 ---
 
-## 3. Часть 2: Python (Flask) приложение
+## 3. Часть 2: Python (FastAPI) приложение
 
-Здесь мы учимся упаковывать реальное приложение на Python.
+В этой части мы упаковываем современное веб-приложение на **FastAPI**.
 
 ### Файлы:
-- `python/app.py`: Код сервера на Flask.
-- `python/requirements.txt`: Список библиотек (в данном случае `flask`).
-- `python/Dockerfile`: Инструкция сборки.
+- `python/src/main.py`: Точка входа в приложение с использованием сервера **uvicorn**.
+- `python/requirements.txt`: Список зависимостей (FastAPI, uvicorn, pydantic и др.).
+- `python/Dockerfile`: Инструкция для создания образа.
 
-### Как работает Dockerfile:
-1.  `FROM python:3.12-slim`: Используем легкую версию Python 3.12.
-2.  `WORKDIR /app`: Создаем папку `/app` внутри контейнера и переходим в неё.
-3.  `RUN pip install -r requirements.txt`: Устанавливаем зависимости.
-4.  `CMD ["python", "app.py"]`: Указываем команду, которая выполнится ПРИ ЗАПУСКЕ контейнера.
+### Что делает Dockerfile:
+1.  `FROM python:3.12-slim`: Используем официальный легковесный образ Python.
+2.  `WORKDIR /app`: Устанавливаем рабочую директорию.
+3.  `COPY requirements.txt .`: Копируем зависимости отдельно для кеширования слоев.
+4.  `RUN pip install -r requirements.txt`: Устанавливаем библиотеки.
+5.  `COPY src/ ./src/`: Копируем исходный код.
+6.  `CMD ["python", "src/main.py"]`: Запускаем сервер uvicorn через основной скрипт.
 
 ---
 
-## 4. Часть 3: Java приложение
+## 4. Часть 3: Java (Spring Boot) приложение
 
-Аналогично Python, но с компиляцией.
+Здесь мы рассматриваем два способа сборки Java-приложения на Maven.
 
 ### Файлы:
-- `java/Main.java`: Код сервера на Java.
-- `java/Dockerfile`: Инструкция сборки.
+- `java/pom.xml`: Описание проекта и его зависимостей для Maven.
+- `java/src/...`: Исходный код на Java (Spring Boot).
+- `java/plain.Dockerfile`: Обычная сборка.
+- `java/multi-stage.Dockerfile`: Оптимизированная сборка.
 
-### Особенность:
-В Java-контейнере нам нужно сначала **скомпилировать** код (`javac Main.java`), а потом запустить скомпилированный класс (`java Main`). Это и прописано в Dockerfile.
+### Multi-stage сборка (Самое важное):
+В обычном Dockerfile (`plain.Dockerfile`) образ содержит и JDK, и Maven, и исходники, что делает его тяжелым. 
+В **Multi-stage** версии мы разделяем процесс:
+1.  **Stage 1 (build)**: Используем образ с Maven, чтобы скомпилировать код и собрать `.jar` файл.
+2.  **Stage 2 (run)**: Берем очень легкий образ только с JRE (среда выполнения) и копируем туда только готовый `.jar` файл. 
+
+**Результат:** Итоговый образ весит в несколько раз меньше и более безопасен.
 
 ---
 
-## 5. Полезные команды для понимания состояния
+## 5. Как запустить и проверить (Инструкции)
+
+### Самый простой и правильный способ (Docker Compose)
+В корневой папке проекта есть файл `docker-compose.yml`. Он позволяет собрать и запустить всё одной командой!
+
+**Запуск сразу всех сервисов:**
+```bash
+docker compose up -d --build
+```
+Это соберет образы для Python и Java, а затем запустит их вместе с Nginx. После запуска вы сможете:
+1. **Nginx:** Открыть [http://localhost:8000](http://localhost:8000) (там должно быть "My name is Kiril").
+2. **Python (FastAPI):** Открыть [http://localhost:8082/docs](http://localhost:8082/docs).
+3. **Java (Spring Boot):** Работает на порту 8081. См. логи `docker compose logs java-app`.
+
+Остановить всё можно командой `docker compose down`.
+
+---
+### Ручной запуск (как альтернатива)
+
+#### 1. Python (FastAPI)
+**Сборка:**
+```bash
+docker build -t python-app ./devops-lab3-main/python
+```
+**Запуск:**
+```bash
+docker run -d --name python-lab3 -p 8082:8080 python-app
+```
+**Проверка:**
+Перейдите по адресу [http://localhost:8082/docs](http://localhost:8082/docs). Если вы видите страницу Swagger — приложение успешно запущено.
+
+#### 2. Java (Spring Boot)
+**Сборка (Plain):**
+```bash
+docker build -t java-app:huge -f devops-lab3-main/java/plain.Dockerfile ./devops-lab3-main/java
+```
+**Сборка (Multi-stage):**
+```bash
+docker build -t java-app:slim -f devops-lab3-main/java/multi-stage.Dockerfile ./devops-lab3-main/java
+```
+**Запуск:**
+```bash
+docker run -d --name java-lab3 -p 8081:8080 java-app:slim
+```
+**Проверка:**
+Приложение запустится на порту 8081. Можно проверить логи: `docker logs java-lab3`.
+
+---
+
+## 6. Полезные команды для понимания состояния
 
 1.  `docker ps`: Показывает все запущенные контейнеры. Ты увидишь `nginx-lab3`, `python-lab3` и `java-lab3`.
 2.  `docker logs <имя>`: Позволяет посмотреть "консоль" запущенного приложения. Если ты зашел на сайт через браузер, в логах `nginx-lab3` появится запись о GET-запросе.
