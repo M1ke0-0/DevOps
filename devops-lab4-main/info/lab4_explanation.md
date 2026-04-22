@@ -1,212 +1,285 @@
-# Лабораторная работа №4: Разбор и объяснение
-
-## Тема
-
-**Описание многоконтейнерного приложения с помощью Docker Compose.**
-
-Цель — научиться связывать несколько Docker-контейнеров в единое приложение: бэкенд, база данных и веб-сервер.
+# Лабораторная работа №4 — Шпаргалка: Docker Compose
 
 ---
 
-## Архитектура приложения
+## Архитектура проекта
 
 ```
 Браузер
-  │  HTTP :80
+  │
   ▼
-┌─────────────────────────────┐
-│  nginx (сеть: frontend)     │  ← раздаёт статику, проксирует /api/v1
-└────────────┬────────────────┘
-             │ proxy_pass → api:8080
-             ▼
-┌─────────────────────────────┐
-│  api — FastAPI              │  ← сети: frontend + backend
-│  (Python, uvicorn, :8080)   │
-└────────────┬────────────────┘
-             │ подключение к db:5432
-             ▼
-┌─────────────────────────────┐
-│  db — PostgreSQL            │  ← сеть: backend
-│  данные в томе db_data      │
-└─────────────────────────────┘
+[nginx :80]  ──── раздаёт фронт (dist/)
+  │                proxy_pass /api/v1 → api:8080
+  ▼
+[api :8080]  ──── FastAPI (Python)
+  │
+  ▼
+[db :5432]   ──── PostgreSQL 15
 ```
 
-Две сети (`frontend`, `backend`) обеспечивают изоляцию:
-- nginx и api видят друг друга (оба в `frontend`)
-- api и db видят друг друга (оба в `backend`)
-- nginx **не имеет** прямого доступа к db — это намеренная защита
+### Сети
+
+| Сервис | frontend | backend |
+|--------|:--------:|:-------:|
+| nginx  | ✓        |         |
+| api    | ✓        | ✓       |
+| db     |          | ✓       |
+
+> `db` недоступна снаружи — только через `api`. Это сетевая изоляция.
 
 ---
 
-## Разбор docker-compose.yml по сервисам
-
-### Сервис `api`
+## docker-compose.yml — разбор по частям
 
 ```yaml
-api:
-  build:
-    context: ./backend
-    dockerfile: Dockerfile
-  networks:
-    - frontend
-    - backend
-  ports:
-    - "8080:8080"
-  env_file:
-    - ./backend/.env
-  depends_on:
-    - db
-  restart: unless-stopped
-```
+services:
 
-| Что | Зачем |
-|---|---|
-| `build: context: ./backend` | Собирает образ из `backend/Dockerfile` |
-| `networks: frontend + backend` | Стоит "между" nginx и db — связывает обе сети |
-| `ports: 8080:8080` | Открывает порт для отладки с хоста |
-| `env_file: ./backend/.env` | Передаёт настройки подключения к БД |
-| `depends_on: db` | Гарантирует, что db запустится первой |
-| `restart: unless-stopped` | Перезапускает при сбоях, но не при ручной остановке |
+  api:
+    build:
+      context: ./backend       # откуда брать файлы для сборки
+      dockerfile: Dockerfile   # какой Dockerfile использовать
+    networks:
+      - frontend               # видит nginx
+      - backend                # видит db
+    ports:
+      - "8080:8080"            # host:container
+    env_file:
+      - ./backend/.env         # переменные окружения из файла
+    depends_on:
+      - db                     # стартует после db (не ждёт готовности!)
+    restart: unless-stopped    # перезапуск при падении, кроме ручной остановки
+
+  db:
+    image: postgres:15         # готовый образ с Docker Hub
+    networks:
+      - backend
+    volumes:
+      - db_data:/var/lib/postgresql/data   # именованный том = данные не теряются
+    environment:               # переменные прямо в compose
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: devopsLabs
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    networks:
+      - frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/dist:/public   # bind mount: папка хоста → папка контейнера
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  frontend:
+    driver: bridge   # стандартная изолированная сеть
+  backend:
+    driver: bridge
+
+volumes:
+  db_data:           # именованный том — управляется Docker'ом
+```
 
 ---
 
-### Сервис `db`
+## Dockerfile backend (Python)
 
-```yaml
-db:
-  image: postgres:15
-  networks:
-    - backend
-  volumes:
-    - db_data:/var/lib/postgresql/data
-  environment:
-    POSTGRES_USER: postgres
-    POSTGRES_PASSWORD: postgres
-    POSTGRES_DB: devopsLabs
-  restart: unless-stopped
+```dockerfile
+FROM python:3.10              # базовый образ
+
+COPY requirements.txt .       # копируем зависимости
+RUN pip install -r requirements.txt && rm requirements.txt
+
+WORKDIR /app                  # рабочая директория внутри контейнера
+COPY src .                    # копируем исходники
+
+CMD ["python", "main.py"]     # команда запуска
 ```
 
-| Что | Зачем |
-|---|---|
-| `image: postgres:15` | Готовый официальный образ PostgreSQL |
-| `networks: backend` | Изолирован от nginx, виден только api |
-| `volumes: db_data:/var/lib/postgresql/data` | Данные сохраняются между перезапусками |
-| `POSTGRES_USER/PASSWORD/DB` | Учётные данные БД — должны совпадать с `.env` бэкенда |
-
-> Значения `DB_USER`, `DB_PASSWORD`, `DB_NAME` в `backend/.env` должны совпадать
-> с `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` здесь.
+**Зачем сначала копируем requirements.txt, а потом src?**
+Docker кеширует слои. Если код изменился, но зависимости — нет, `pip install` не перезапускается. Экономия времени сборки.
 
 ---
 
-### Сервис `nginx`
+## Dockerfile nginx (multi-stage)
 
-```yaml
-nginx:
-  build:
-    context: ./nginx
-    dockerfile: Dockerfile
-  networks:
-    - frontend
-  ports:
-    - "80:80"
-  volumes:
-    - ./nginx/dist:/public
-  depends_on:
-    - api
-  restart: unless-stopped
+```dockerfile
+# Стадия 1: сборка nginx из исходников
+FROM alpine:3 as nginxbuild
+RUN apk add ... && wget nginx-source && ./configure ... && make && make install
+
+# Стадия 2: финальный образ — только бинарник, без инструментов сборки
+FROM alpine:3
+COPY --from=nginxbuild /nginx /nginx   # копируем только готовый nginx
+COPY nginx.conf /nginx/conf/nginx.conf
 ```
 
-| Что | Зачем |
-|---|---|
-| `build: context: ./nginx` | Собирает образ из `nginx/Dockerfile` |
-| `networks: frontend` | Видит только api, не видит db |
-| `ports: 80:80` | Основная точка входа для браузера |
-| `volumes: ./nginx/dist:/public` | Монтирует билд фронтенда внутрь контейнера |
-| `depends_on: api` | Запускается после api |
+**Multi-stage build** — финальный образ маленький, компилятор и wget в него не попадают.
 
 ---
 
-## Как nginx связан с api
-
-В `nginx/nginx.conf` настроен reverse proxy:
+## nginx.conf — как работает проксирование
 
 ```nginx
-location /api/v1 {
-    proxy_pass http://api:8080;
+server {
+    listen 80;
+    root /public;          # фронт лежит здесь
+
+    location / {
+        index index.html;
+        try_files $uri /index.html =404;   # SPA: все маршруты → index.html
+    }
+
+    location /api/v1 {
+        proxy_pass http://api:8080;        # имя сервиса = DNS внутри Docker-сети
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
 }
 ```
 
-- `api` — это имя сервиса в Docker Compose, Docker сам резолвит его в IP контейнера
-- Запросы на `http://localhost/api/v1/...` nginx перенаправляет на `http://api:8080/api/v1/...`
-- Статика (HTML, JS, CSS) из `/public` отдаётся напрямую
+> `api` в `proxy_pass` — это имя сервиса из `docker-compose.yml`. Docker автоматически резолвит его в IP контейнера.
 
 ---
 
-## Как бэкенд подключается к БД
+## .env файл backend
 
-В `backend/.env` задаются переменные:
 ```env
-DB_ADDR=db        # имя сервиса db — Docker резолвит сам
+SERVER_ADDR="0.0.0.0"    # слушать на всех интерфейсах
+SERVER_PORT=8080
+DB_ADDR=db               # имя сервиса db — работает как hostname
 DB_USER=postgres
 DB_PASSWORD=postgres
 DB_PORT=5432
 DB_NAME=devopsLabs
 ```
 
-Бэкенд (FastAPI + pydantic-settings) читает их через класс `Settings` и использует для подключения к PostgreSQL.
+> Значения `DB_USER`, `DB_PASSWORD`, `DB_NAME` должны совпадать с `POSTGRES_*` в `docker-compose.yml`.
 
 ---
 
-## Порядок запуска
+## Приложение (FastAPI)
 
+**Стек:** Python + FastAPI + SQLAlchemy + PostgreSQL
+
+### API endpoints (`/api/v1/users`)
+
+| Метод  | Путь           | Действие                  |
+|--------|----------------|---------------------------|
+| GET    | `/`            | Список всех пользователей |
+| GET    | `/{id}`        | Получить пользователя     |
+| POST   | `/`            | Создать пользователя      |
+| PUT    | `/{id}`        | Обновить пользователя     |
+| DELETE | `/?user_id=id` | Удалить пользователя      |
+
+### Модель пользователя
+
+```python
+User:
+  id       int  (автоинкремент)
+  name     str
+  age      int
+  male     bool
 ```
-db  →  api  →  nginx
+
+---
+
+## Ключевые концепции Docker Compose
+
+### volumes — типы
+
+| Тип | Пример | Где хранится |
+|-----|--------|-------------|
+| Именованный том | `db_data:/var/lib/postgresql/data` | Управляет Docker |
+| Bind mount | `./nginx/dist:/public` | Папка на хосте |
+
+### depends_on
+
+```yaml
+depends_on:
+  - db
 ```
 
-`depends_on` задаёт порядок старта, но не ждёт готовности приложения внутри контейнера.
-Если api падает с ошибкой подключения к db при первом старте — это нормально, `restart: unless-stopped` поднимет его снова.
+Гарантирует **порядок запуска**, но НЕ гарантирует что db готова принимать подключения. Для этого нужен `healthcheck`.
+
+### restart политики
+
+| Значение | Поведение |
+|----------|-----------|
+| `no` | Не перезапускать (по умолчанию) |
+| `always` | Всегда перезапускать |
+| `unless-stopped` | Перезапускать, кроме ручной остановки |
+| `on-failure` | Только при ненулевом exit code |
 
 ---
 
-## Что нужно сделать для выполнения лабы
-
-1. Скопировать `backend/.env.example` в `backend/.env` и заполнить переменные:
-   ```bash
-   cp backend/.env.example backend/.env
-   ```
-   Убедиться, что `DB_ADDR=db`, и значения `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-   совпадают с переменными сервиса `db` в `docker-compose.yml`.
-
-2. Положить билд фронтенда в `nginx/dist/` (или убедиться, что он уже там есть).
-
-3. Запустить:
-   ```bash
-   docker compose up --build -d
-   ```
-
-4. Проверить статус:
-   ```bash
-   docker compose ps
-   ```
-   Все три сервиса должны быть в состоянии `running`, без постоянных рестартов.
-
-5. Проверить в браузере: `http://localhost` — должна открыться страница фронтенда.
-
----
-
-## Команды для отладки
+## Основные команды
 
 ```bash
-# Посмотреть логи сервиса
-docker compose logs -f api
+# Собрать и запустить все сервисы
+docker compose up --build
 
-# Зайти внутрь контейнера
-docker compose exec api bash
+# Запустить в фоне
+docker compose up -d --build
+
+# Посмотреть логи
+docker compose logs -f
+docker compose logs -f api       # только api
+
+# Статус сервисов
+docker compose ps
+
+# Остановить и удалить контейнеры
+docker compose down
+
+# Удалить вместе с томами (данные БД тоже удалятся!)
+docker compose down -v
+
+# Войти в контейнер
+docker compose exec api sh
 docker compose exec db psql -U postgres -d devopsLabs
 
 # Перезапустить один сервис
 docker compose restart api
+```
 
-# Полностью пересобрать
-docker compose down && docker compose up --build -d
+---
+
+## Как проверить что всё работает
+
+```bash
+# 1. Убедиться что все сервисы Up
+docker compose ps
+
+# 2. Открыть в браузере
+http://localhost              # фронт
+http://localhost/api/v1/users # список пользователей (должен вернуть [])
+
+# 3. Создать пользователя
+curl -X POST http://localhost/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ivan","age":20,"male":true}'
+
+# 4. Проверить — db не доступна с хоста напрямую (порт 5432 не проброшен)
+```
+
+---
+
+## Схема взаимодействия (итог)
+
+```
+Хост
+├── :80   → nginx  (frontend сеть)
+│           ├── /         → раздаёт /public (dist/)
+│           └── /api/v1   → proxy_pass → api:8080
+│
+├── :8080 → api   (frontend + backend сети)
+│           └── → db:5432
+│
+└── :5432   НЕ ДОСТУПЕН  (db только в backend сети, порт не проброшен)
 ```
